@@ -1,0 +1,1931 @@
+/*
+  ==========================================================================
+  PART 1: GLOBAL VARIABLES & PHYSICS
+  ==========================================================================
+  Defines the cyberpunk/modern color palette, typography scales, 
+  and strict hardware-accelerated spring physics for animations.
+*/
+:root {
+    /* Backgrounds: Deep space darks with subtle shifts for elevation */
+    --bg-deep: #050508;
+    --bg-shell: #0a0a0f;
+    --bg-card: #12121a;
+    --bg-glass: rgba(18, 18, 26, 0.65);
+
+    /* Accents: High-contrast neon markers */
+    --neon-green: #00ffcc;
+    --neon-cyan: #00ccff;
+    --neon-pink: #ff3366;
+    --warning-red: #ff3344;
+    --accent-gold: #ffaa00;
+
+    /* Text: High legibility scales */
+    --text-main: #f0f0f5;
+    --text-muted: #8a8a9e;
+
+    /* RPG Rank / Tier Colors */
+    --rank-s: #ffaa00; /* Legendary Gold */
+    --rank-a: #ff3366; /* Mythic Pink */
+    --rank-b: #00ccff; /* Epic Cyan */
+    --rank-c: #00ffcc; /* Rare Green */
+    --rank-d: #8a8a9e; /* Common Steel */
+    --rank-e: #555566; /* Novice Rust */
+    --rank-f: #333344; /* Failed/Low */
+
+    /* 
+      Animation Physics: 
+      Strict cubic-bezier for a "springy" iOS-like fluid feel.
+      Never animate layout properties, only transform/opacity. 
+    */
+    --spring: cubic-bezier(0.22, 1, 0.36, 1);
+    --spring-fast: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/*
+  ==========================================================================
+  PART 2: RESET & DESKTOP FRAME
+  ==========================================================================
+  Universal box-sizing and a body flexbox setup that forces the #app-shell
+  to render exactly like a mobile viewport, even on ultra-wide desktop monitors.
+*/
+*, *::before, *::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-deep);
+    color: var(--text-main);
+    font-family: 'Inter', -apple-system, sans-serif;
+    
+    /* Center the app shell on larger screens */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 
+  The #app-shell is the strict mobile viewport boundary.
+  It mimics a modern smartphone frame, locking overflow to prevent 
+  desktop scrollbars and maintaining absolute aspect ratio control.
+*/
+#app-shell {
+    width: 100%;
+    max-width: 412px;     /* Typical max mobile device width */
+    height: 100vh;
+    max-height: 860px;    /* Prevents awkward stretching on massive displays */
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--bg-shell);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+/*
+  ==========================================================================
+  PART 3: HEADS UP DISPLAY (HUD) & TELEMETRY
+  ==========================================================================
+  The top header containing identity, rank, XP progression, and economy.
+  Uses backdrop-filter for glassmorphism.
+*/
+#hud {
+    position: relative;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0; /* Never shrink the HUD when viewport fills up */
+}
+
+/* User Identity Row */
+.hud-identity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.avatar-container {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--bg-card);
+}
+
+.avatar-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--neon-cyan);
+}
+
+.level-indicator {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--neon-cyan);
+    color: var(--bg-deep);
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+}
+
+.rank-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+}
+
+.pilot-name {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+#user-rank {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--rank-d);
+    text-transform: uppercase;
+}
+
+/* Telemetry / XP Bar Row */
+.hud-telemetry {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.xp-readout {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* 
+  XP Bar Animation:
+  Strictly animating 'transform: scaleX()' avoids expensive layout repaints.
+  'transform-origin: left' ensures the bar grows from left to right. 
+*/
+#xp-bar-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#xp-bar-fill {
+    height: 100%;
+    background: var(--neon-cyan);
+    border-radius: 4px;
+    transform-origin: left;
+    /* width is set inline to 85%, so we scale to 1 to match the inline width, 
+       or JS will update the transform directly. Transition scales smoothly. */
+    transition: transform 0.6s var(--spring);
+    will-change: transform;
+}
+
+/* Economy / Token Pills Row */
+.hud-economy {
+    display: flex;
+    gap: 12px;
+}
+
+.pill-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.icon-fire { color: var(--accent-gold); }
+.icon-coin { color: var(--neon-green); }
+
+/*
+  ==========================================================================
+  PART 4: VIEWPORT & VIEW SWITCHING LOGIC
+  ==========================================================================
+  The #viewport acts as the routing container. It takes up remaining space
+  and completely hides inactive sections. Active sections animate in.
+*/
+#viewport {
+    flex: 1;
+    position: relative;
+    overflow-y: hidden; /* Scroll is handled by the active child section */
+    background-color: var(--bg-shell);
+}
+
+/* Inactive sections are completely hidden and stacked on top of each other */
+#viewport > section {
+    display: none;
+    position: absolute;
+    inset: 0;           /* top, right, bottom, left = 0 */
+    overflow-y: auto;   /* Enable vertical scrolling within the view */
+    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS */
+}
+
+/* Active sections use Flexbox for internal layout and trigger a fade-in */
+#viewport > section.active-view {
+    display: flex;
+    flex-direction: column;
+    animation: viewFadeIn 0.35s var(--spring) forwards;
+}
+
+/* 
+  Hardware-accelerated fade-in.
+  Translates slightly upward while fading in.
+*/
+@keyframes viewFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/*
+  ==========================================================================
+  PART 5: BOTTOM NAVIGATION BAR
+  ==========================================================================
+  Fixed at the bottom of the #app-shell. Uses Flexbox to evenly distribute
+  navigation buttons. Features touch-friendly hitboxes and tactile scale animations.
+*/
+#bottom-nav {
+    position: relative;
+    z-index: 100;
+    width: 100%;
+    height: 64px;
+    background: var(--bg-card);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-shrink: 0;
+}
+
+.nav-bar-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-around;
+}
+
+.nav-bar-item {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+}
+
+/* Reset button default styles and create touch target */
+.nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+    padding: 8px 0;
+    cursor: pointer;
+    outline: none;
+    
+    /* Hardware acceleration prep */
+    transition: color 0.2s linear, transform 0.15s var(--spring-fast);
+    will-change: transform;
+}
+
+.nav-icon {
+    width: 24px;
+    height: 24px;
+    stroke: currentColor;
+    transition: filter 0.2s linear;
+}
+
+.nav-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+/* 
+  Active state highlights. 
+  Targets both .active-tab (from HTML) and .active-nav (fallback). 
+*/
+.nav-btn.active-tab,
+.nav-btn.active-nav {
+    color: var(--neon-green);
+}
+
+.nav-btn.active-tab .nav-icon,
+.nav-btn.active-nav .nav-icon {
+    filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.6));
+}
+
+/* 
+  Tactile click animation.
+  Strictly transforms scale down using the fast spring curve.
+*/
+.nav-btn:active {
+    transform: scale(0.85);
+}
+
+/*
+  ==========================================================================
+  PART 6: QUESTS & TRACKING HUB (#view-quests)
+  ==========================================================================
+  Layout: Flex column container. Contains horizontal scrollable navigation 
+  and vertical flex layout for the quest cards.
+*/
+#view-quests {
+    padding: 16px;
+    padding-bottom: 24px; /* Extra padding for bottom-nav clearance */
+    gap: 20px;
+}
+
+/* 
+  Track Selector & Category Filters:
+  Horizontal scrolling flex containers. 
+  - `overflow-x: auto` allows side-scrolling.
+  - `-webkit-overflow-scrolling: touch` ensures momentum scrolling on iOS.
+  - Scrollbars are hidden for a clean, app-like UI.
+*/
+#fitness-track-selector,
+.category-filter-bar {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    scrollbar-width: none; /* Firefox */
+}
+
+#fitness-track-selector::-webkit-scrollbar,
+.category-filter-bar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+/* Track Selector Segment Buttons */
+#fitness-track-selector {
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.segment-btn {
+    flex: 1 0 auto; /* Allow buttons to size based on content but fill space */
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s linear, transform 0.2s var(--spring);
+    will-change: transform;
+}
+
+.segment-btn.selected {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.segment-btn:active {
+    transform: scale(0.95);
+}
+
+/* Category Filter Pills */
+.filter-list {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.filter-btn {
+    white-space: nowrap; /* Prevents text from wrapping to two lines */
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: transform 0.2s var(--spring-fast);
+    will-change: transform;
+}
+
+.filter-btn.active {
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--bg-deep);
+    border-color: transparent;
+    font-weight: 700;
+}
+
+.filter-btn:active {
+    transform: scale(0.92);
+}
+
+/* 
+  Quest Feed & Card Layout:
+  Uses a vertical Flexbox column to stack cards. 
+*/
+.quest-feed-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.quest-card {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Card Internals */
+.quest-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.quest-meta {
+    display: flex;
+    gap: 8px;
+}
+
+/* RPG Rank & Category Badges */
+.category-badge,
+.rpg-rank-badge,
+.reward-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.category-badge.physical-badge { background: rgba(0, 255, 204, 0.1); color: var(--neon-green); }
+.category-badge.cardio-badge   { background: rgba(0, 204, 255, 0.1); color: var(--neon-cyan); }
+.category-badge.mental-badge   { background: rgba(255, 170, 0, 0.1); color: var(--accent-gold); }
+.category-badge.campus-badge   { background: rgba(255, 51, 102, 0.1); color: var(--neon-pink); }
+
+.rpg-rank-badge.rank-c { border: 1px solid var(--rank-c); color: var(--rank-c); }
+.rpg-rank-badge.rank-d { border: 1px solid var(--rank-d); color: var(--rank-d); }
+.rpg-rank-badge.rank-e { border: 1px solid var(--rank-e); color: var(--rank-e); }
+.rpg-rank-badge.rank-f { border: 1px solid var(--rank-f); color: var(--rank-f); }
+
+.reward-tag {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+    border: 1px dotted rgba(255, 255, 255, 0.2);
+}
+
+.quest-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+}
+
+.quest-desc {
+    margin: 0 0 8px 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+/* Target Checklist */
+.target-checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.checklist-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.85rem;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+.cyber-checkbox {
+    margin-top: 2px;
+    accent-color: var(--neon-cyan);
+}
+
+/* Primary Action Buttons */
+.btn-action {
+    width: 100%;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    text-transform: uppercase;
+    transition: opacity 0.2s linear, transform 0.15s var(--spring-fast);
+    will-change: transform;
+}
+
+.btn-action.primary-action {
+    background: var(--neon-cyan);
+    color: var(--bg-deep);
+}
+
+.btn-action.secondary-action {
+    background: transparent;
+    color: var(--text-main);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-action:active {
+    /* STRICT GPU MOTION: Shrink button on physical press */
+    transform: scale(0.95);
+}
+
+/*
+  ==========================================================================
+  PART 7: EDUCATIONAL VERTICAL FEED (#view-feed)
+  ==========================================================================
+  CSS Scroll Snapping:
+  Creates a TikTok/Reels-like vertical snap experience.
+  - `scroll-snap-type: y mandatory` forces the container to stop directly 
+    on the start edge of child elements.
+*/
+#view-feed {
+    scroll-snap-type: y mandatory;
+    overflow-y: scroll;
+    height: 100%;
+    position: relative;
+    scrollbar-width: none; /* Hide scrollbar for immersion */
+}
+
+#view-feed::-webkit-scrollbar {
+    display: none;
+}
+
+/* Feed Sub-Navigation (Floats above snap content) */
+.feed-header-nav {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 50;
+    padding: 16px;
+    background: linear-gradient(to bottom, rgba(10, 10, 15, 0.9) 0%, transparent 100%);
+}
+
+.channel-list {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.channel-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    position: relative;
+    padding-bottom: 4px;
+    transition: opacity 0.2s linear, transform 0.2s var(--spring-fast);
+    will-change: transform;
+}
+
+.channel-btn.active {
+    color: var(--text-main);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.channel-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2px;
+    background: var(--text-main);
+    border-radius: 2px;
+}
+
+.channel-btn:active {
+    transform: scale(0.9);
+}
+
+/* 
+  Individual Feed Post:
+  - Takes up 100% of the parent container's height.
+  - `scroll-snap-align: start` snaps the top of this element to the top of the viewport.
+*/
+.feed-post {
+    scroll-snap-align: start;
+    scroll-snap-stop: always; /* Force stop on fast swipes */
+    height: 100%;
+    min-height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end; /* Pushes content to the bottom */
+    overflow: hidden;
+}
+
+/* Background Simulation Container */
+.post-media-layer,
+.feed-media-canvas {
+    position: absolute;
+    inset: 0; /* top: 0, right: 0, bottom: 0, left: 0 */
+    z-index: 1;
+    background: var(--bg-deep); /* Fallback */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Dark gradient overlay ensures UI and text remain legible over complex backgrounds */
+.feed-post::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: linear-gradient(to top, rgba(5, 5, 8, 0.95) 0%, rgba(5, 5, 8, 0.4) 40%, transparent 80%);
+    pointer-events: none;
+}
+
+/* 
+  Interaction Dock (Right Side):
+  Vertical flex column pinned to the right edge. 
+*/
+.post-interaction-dock {
+    position: absolute;
+    right: 12px;
+    bottom: 120px; /* Offset to sit above the caption area */
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.dock-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: transform 0.2s var(--spring-fast);
+    will-change: transform;
+}
+
+.dock-icon {
+    width: 32px;
+    height: 32px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.dock-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.dock-btn:active {
+    transform: scale(0.8);
+}
+
+/* 
+  Post Overlay UI & Caption Box:
+  Pinned to the bottom, expanding left to right.
+*/
+.post-info-layer {
+    position: relative;
+    z-index: 10;
+    padding: 16px;
+    padding-right: 64px; /* Prevent text from overlapping the right interaction dock */
+    padding-bottom: 80px; /* Clear the global bottom nav */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.author-block {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.author-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    object-fit: cover;
+}
+
+.author-handle {
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.verified-badge {
+    width: 14px;
+    height: 14px;
+}
+
+.post-timestamp {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Tags and Audio Pill */
+.post-meta-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.topic-pill,
+.audio-pill {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-main);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.post-title {
+    margin: 4px 0 0 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1.3;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+.post-caption {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.85);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    
+    /* Display up to 3 lines, truncate with ellipsis */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Expandable Formula Box / Details Override */
+.expandable-formula-breakdown {
+    position: absolute;
+    bottom: 25%;
+    left: 16px;
+    right: 72px; /* avoid dock */
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    z-index: 5;
+    padding: 12px;
+}
+
+.formula-summary {
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    color: var(--neon-cyan);
+}
+
+.formula-content {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-main);
+}
+
+/*
+  ==========================================================================
+  PART 8: EXAMINATIONS TERMINAL (#view-tests)
+  ==========================================================================
+  Layout: Vertical flex layout with a sticky warning banner.
+  Aesthetics: Hardened, terminal-like appearance to convey high stakes.
+*/
+#view-tests {
+    padding: 0 0 24px 0; /* Padding left/right handled by children to let banner span 100% */
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 
+  Anti-Cheat Telemetry Banner:
+  Sticks to the top of the viewport. Bold warning colors.
+*/
+#anti-cheat-telemetry {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(255, 51, 68, 0.15); /* Translucent red */
+    border-bottom: 2px solid var(--warning-red);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--text-main);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.alert-text-payload strong {
+    color: var(--warning-red);
+    font-weight: 800;
+}
+
+.glitch-effect {
+    animation: pulseOpacity 2s infinite;
+}
+
+@keyframes pulseOpacity {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Test Selection HUD */
+.test-selection-hud {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.global-clearance-score {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 12px;
+    border-radius: 4px;
+    border-left: 3px solid var(--neon-cyan);
+}
+
+.text-accent {
+    color: var(--neon-cyan);
+    font-weight: 700;
+}
+
+/* 
+  Trial Card (Terminal Aesthetic):
+  Sharper corners, darker backgrounds, monospace font injections.
+*/
+.trial-feed-container {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.trial-card {
+    background: #0a0a0c;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px; /* Sharper than quest cards */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.trial-header {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.trial-meta-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.trial-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.trial-economy-pills {
+    display: flex;
+    gap: 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* 
+  Countdown Timer Bar:
+  Utilizes scaleX for GPU-only scaling. `transform-origin: left` ensures 
+  the bar shrinks towards the left edge rather than the center.
+*/
+.countdown-track {
+    margin-top: 12px;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.timer-fill {
+    height: 100%;
+    background: var(--warning-red);
+    transform-origin: left;
+    /* JS sets scaleX based on remaining time. Linear transition prevents snapping. */
+    transition: transform 1s linear; 
+    will-change: transform;
+}
+
+/* Simulated terminal blocks inside trials */
+.simulated-terminal-block,
+.simulated-email-header,
+.simulated-exif-block {
+    background: #000;
+    border: 1px solid rgba(0, 255, 204, 0.2);
+    padding: 12px;
+    border-radius: 4px;
+    margin: 12px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--neon-green);
+    line-height: 1.5;
+}
+
+.text-danger { color: var(--warning-red); }
+.font-bold { font-weight: 700; color: var(--text-main); }
+
+/* 
+  Interactive Radio Inputs:
+  We hide the native radio button and style the label to act as a 
+  large, touch-friendly block. We use ::before on the custom circle 
+  to create the selected state indicator.
+*/
+.radio-input-group {
+    border: none;
+    padding: 0 16px 16px 16px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s linear, border-color 0.2s linear;
+}
+
+/* Hide native input without breaking screen readers */
+.radio-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* The neon custom checkbox outer ring */
+.custom-radio-circle {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+    transition: border-color 0.2s linear;
+}
+
+/* The neon custom checkbox inner dot (appears via opacity) */
+.custom-radio-circle::before {
+    content: '';
+    position: absolute;
+    inset: 3px; /* Creates inner spacing */
+    background: var(--neon-cyan);
+    border-radius: 50%;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity 0.2s linear, transform 0.2s var(--spring);
+    will-change: transform, opacity;
+}
+
+/* Checked State CSS */
+.radio-option input[type="radio"]:checked ~ .custom-radio-circle {
+    border-color: var(--neon-cyan);
+}
+
+.radio-option input[type="radio"]:checked ~ .custom-radio-circle::before {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.radio-option input[type="radio"]:checked ~ .option-text {
+    color: var(--neon-cyan);
+}
+
+/* Disabled State Visuals */
+.radio-option input[type="radio"]:disabled ~ .option-text {
+    opacity: 0.5;
+}
+
+.option-text {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    transition: color 0.2s linear;
+}
+
+/* Trial Action Buttons */
+.trial-actions {
+    padding: 0 16px 16px 16px;
+}
+
+.btn-action.success-action {
+    background: var(--neon-green);
+    color: var(--bg-deep);
+}
+
+.hidden {
+    display: none !important;
+}
+
+/*
+  ==========================================================================
+  PART 9: 2D BATTLE ROYALE ARENA (#view-arena)
+  ==========================================================================
+  The arena overtakes the entire app shell. Scrolling is strictly forbidden.
+*/
+#view-arena {
+    background: var(--bg-deep);
+    position: absolute;
+    inset: 0;
+    z-index: 200; /* Puts it above bottom-nav when active */
+    overflow: hidden;
+}
+
+/* 
+  Arena HUD & Top Telemetry:
+  Absolute positioned to float over the canvas. Pointer-events are disabled 
+  so users don't accidentally click the HUD when trying to aim.
+*/
+#arena-hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+    padding: 16px;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hud-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.sector-tag {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--neon-cyan);
+    padding: 4px 10px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--neon-cyan);
+    backdrop-filter: blur(4px);
+}
+
+.pulse-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--neon-cyan);
+    border-radius: 50%;
+    animation: pulseOpacity 1.5s infinite;
+}
+
+.match-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.stat-pill {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 8px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Vital Bars: HP and Shield */
+.hud-bars-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 60%; /* Limit width on mobile */
+}
+
+.vital-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vital-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    width: 45px;
+}
+
+/* 
+  Transform origin left ensures HP depletes from right to left.
+  Using scaleX allows 60FPS fluid drops when damage is taken.
+*/
+.game-bar-track {
+    flex: 1;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.game-bar-fill {
+    height: 100%;
+    transform-origin: left;
+    transition: transform 0.2s var(--spring-fast);
+    will-change: transform;
+}
+
+.fill-danger { background: var(--warning-red); }
+.fill-cyber { background: var(--neon-cyan); }
+
+/* 
+  Minimap Dock:
+  Small localized overlay preview.
+*/
+#campus-minimap-dock {
+    position: absolute;
+    top: 90px;
+    right: 16px;
+    width: 80px;
+    height: 80px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 
+  HTML5 Game Canvas Overlay Setup:
+  Forces the canvas to stretch to viewport bounds. 
+  Background grid simulated via linear-gradients for a synthwave look.
+*/
+.canvas-render-target {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#game-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain; /* Prevents aspect ratio distortion */
+    background-color: var(--bg-deep);
+    background-image: 
+        linear-gradient(rgba(0, 255, 204, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 204, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* 
+  Tactical HUD (Bottom Action Bar):
+  Holds weapons/tools and virtual touch inputs.
+*/
+#tactical-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+}
+
+.weapon-inventory-slots {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.inventory-slot {
+    width: 64px;
+    height: 64px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    backdrop-filter: blur(4px);
+    transition: transform 0.2s var(--spring-fast);
+}
+
+.inventory-slot.slot-active {
+    border-color: var(--neon-green);
+    box-shadow: 0 0 12px rgba(0, 255, 204, 0.3);
+    transform: translateY(-4px); /* Slight lift on active item */
+}
+
+/* 
+  Pre-Drop Modal & Password Entropy Meters:
+  Takes over the screen until deployment.
+*/
+#arena-preflight-modal {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: rgba(5, 5, 8, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.preflight-dialog-box {
+    background: var(--bg-card);
+    border: 1px solid var(--neon-cyan);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0, 204, 255, 0.1);
+}
+
+/* Password input field styling */
+.cyber-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-main);
+    padding: 12px 40px 12px 12px;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: border-color 0.2s linear;
+}
+
+.cyber-input:focus {
+    outline: none;
+    border-color: var(--neon-cyan);
+}
+
+/* Feedback Meters */
+.realtime-feedback-meters {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.meter-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.meter-fill {
+    height: 100%;
+    transform-origin: left;
+    transition: transform 0.3s var(--spring-fast);
+    will-change: transform;
+}
+
+.fill-warning { background: var(--accent-gold); }
+
+/*
+  ==========================================================================
+  PART 10: TOKEN ECONOMY & REWARDS HUB (#view-shop)
+  ==========================================================================
+  Layout: Flexbox base with a CSS Grid for inventory items.
+*/
+#view-shop {
+    padding: 16px;
+    padding-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* 
+  Hero Banner / Limited Drop:
+  Prominent gradient styling. We use an opacity keyframe animation 
+  to simulate a pulsating neon glow without triggering layout/paint repaints 
+  (strictly adhering to GPU-only motion).
+*/
+#limited-drop-banner {
+    position: relative;
+    background: linear-gradient(135deg, rgba(255, 51, 102, 0.2) 0%, rgba(10, 10, 15, 0.9) 100%);
+    border: 1px solid var(--neon-pink);
+    border-radius: 12px;
+    padding: 20px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 0 20px rgba(255, 51, 102, 0.1);
+}
+
+.promo-glitch {
+    animation: pulseGlow 2s infinite var(--spring);
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+}
+
+.banner-content {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Live Stock Ticker */
+.live-stock-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 4px 8px;
+    border-radius: 4px;
+    width: max-content;
+}
+
+.pulse-dot.red {
+    background: var(--warning-red);
+}
+
+.promo-headline {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--neon-pink);
+    text-transform: uppercase;
+}
+
+.promo-subheadline {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-main);
+}
+
+.promo-desc {
+    margin: 0;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.4;
+}
+
+.banner-visuals {
+    position: absolute;
+    right: -20px;
+    bottom: -20px;
+    z-index: 1;
+    opacity: 0.4;
+}
+
+.promo-hologram {
+    width: 150px;
+    height: auto;
+    filter: drop-shadow(0 0 10px var(--neon-pink));
+}
+
+/* Shop Category Filter Pills */
+.shop-category-filters {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.shop-category-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-pill-list {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.shop-filter-btn {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: transform 0.2s var(--spring-fast);
+    will-change: transform;
+}
+
+.shop-filter-btn.active {
+    background: var(--text-main);
+    color: var(--bg-deep);
+}
+
+.shop-filter-btn:active {
+    transform: scale(0.92);
+}
+
+/* Shop Inventory Grid */
+.shop-inventory-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+
+/* Shop Card Styling */
+.shop-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* Base border, overwritten by rarity modifiers */
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Rarity Modifiers mapping to root variables */
+.rarity-legendary { border-color: var(--rank-s); }
+.rarity-epic { border-color: var(--rank-b); }
+.rarity-rare { border-color: var(--rank-c); }
+
+.text-legendary { color: var(--rank-s); }
+.text-epic { color: var(--rank-b); }
+.text-rare { color: var(--rank-c); }
+
+.shop-thumbnail-container {
+    position: relative;
+    width: 100%;
+    height: 140px;
+    background: #000;
+    margin: 0;
+}
+
+.shop-item-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.8;
+}
+
+.thumbnail-overlay {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+}
+
+.yield-type {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.badge-realworld { border: 1px solid var(--rank-s); color: var(--rank-s); }
+.badge-sponsor { border: 1px solid var(--neon-cyan); color: var(--neon-cyan); }
+.badge-cosmetic { border: 1px solid var(--neon-pink); color: var(--neon-pink); }
+
+.shop-card-body {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.shop-item-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.shop-item-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.shop-item-desc {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+.shop-card-footer {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-buy {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s linear, transform 0.15s var(--spring-fast);
+    will-change: transform;
+}
+
+.btn-buy:active {
+    transform: scale(0.9);
+}
+
+.action-legendary { background: var(--rank-s); color: var(--bg-deep); }
+.action-epic { background: var(--rank-b); color: var(--bg-deep); }
+.action-rare { background: var(--rank-c); color: var(--bg-deep); }
+
+
+/*
+  ==========================================================================
+  PART 11: SYSTEM MODALS OVERLAY ARCHITECTURE
+  ==========================================================================
+  These structural classes govern the popup alerts and scanners.
+*/
+.modal-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(5, 5, 8, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    /* We animate opacity for the background overlay */
+    transition: opacity 0.25s var(--spring);
+    will-change: opacity;
+}
+
+/* 
+  THE POINTER-EVENTS TRICK:
+  When a modal is hidden, we set `opacity: 0` so it disappears visually.
+  However, it still exists in the DOM and would block clicks from reaching 
+  the main UI below it. By applying `pointer-events: none;`, we instruct 
+  the browser to ignore the hidden overlay entirely for mouse/touch inputs.
+*/
+.modal-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.modal-card {
+    background: var(--bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    /* The modal inner card scales up slightly as it fades in */
+    transform: scale(1);
+    transition: transform 0.25s var(--spring);
+    will-change: transform;
+}
+
+/* When the overlay is hidden, shrink the inner card for a zoom-out effect */
+.modal-hidden .modal-card {
+    transform: scale(0.95);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.btn-close-modal {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 0.2s var(--spring-fast);
+}
+
+.btn-close-modal:active {
+    transform: scale(0.8);
+}
+
+.modal-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* QR Viewfinder Styling */
+.camera-feed-simulation {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    background: #000;
+    padding: 24px;
+    border-radius: 8px;
+}
+
+.scanner-viewfinder {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bracket {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-color: var(--neon-cyan);
+    border-style: solid;
+    border-width: 0;
+}
+
+.top-left { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; }
+.top-right { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; }
+.bottom-left { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; }
+.bottom-right { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; }
+
+/* GPU-accelerated scan line */
+.scan-line-animation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 8px var(--neon-cyan);
+    transform-origin: center top;
+    animation: scanLine 2s linear infinite;
+    will-change: transform;
+}
+
+@keyframes scanLine {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(160px); } /* Viewfinder height */
+}
+
+/* Anti-Cheat Penalty specific styles */
+.border-danger { border-color: var(--warning-red); }
+.header-danger { background: rgba(255, 51, 68, 0.1); justify-content: flex-start; gap: 12px; }
+.text-danger { color: var(--warning-red); }
+
+.penalty-desc {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-main);
+}
+
+.penalty-list {
+    margin: 0;
+    padding: 12px;
+    list-style: none;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+    color: var(--warning-red);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.modal-footer {
+    padding: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+
+/*
+  ==========================================================================
+  PART 12: UTILITY CLASSES & RESPONSIVE BREAKPOINTS
+  ==========================================================================
+*/
+
+.w-100 { width: 100%; }
+.text-center { text-align: center; }
+.text-uppercase { text-transform: uppercase; }
+.text-mono { font-family: 'JetBrains Mono', monospace; }
+.text-micro { font-size: 0.7rem; }
+.text-muted { color: var(--text-muted); }
+.font-bold { font-weight: 700; }
+
+.danger-action {
+    background: var(--warning-red);
+    color: var(--text-main);
+}
+
+.divider-text {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.divider-text::before,
+.divider-text::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.divider-text span {
+    padding: 0 10px;
+}
+
+/* 
+  Graceful degradation for smaller screens (e.g., iPhone SE/mini). 
+  We reduce padding and typography slightly to prevent wrapping issues.
+*/
+@media (max-width: 360px) {
+    #hud {
+        padding: 12px;
+    }
+    
+    .pilot-name {
+        font-size: 0.9rem;
+    }
+    
+    .btn-action {
+        padding: 10px;
+        font-size: 0.75rem;
+    }
+    
+    .quest-card,
+    .trial-card,
+    .shop-card {
+        padding: 12px;
+    }
+    
+    .shop-thumbnail-container {
+        height: 120px;
+    }
+    
+    .nav-label {
+        font-size: 0.6rem;
+    }
+}

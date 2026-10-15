@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <!--
+      ==========================================================================
+      ARCHITECTURAL INSTRUCTION: DOCUMENT HEAD & META STRATEGY
+      ==========================================================================
+      - DOM Structure: Standard HTML5 boilerplate heavily optimized for mobile-first PWA.
+      - CSS Targeting/Setup: Preconnected fonts (JetBrains Mono for data/HUD, Inter for UI).
+      - Bulletproof Thinking: `user-scalable=no` and `viewport-fit=cover` ensure native app-like 
+        handling, preventing layout shifts during input focus. 
+      - Suggestion: In production, inject a strict Content-Security-Policy (CSP) here to mitigate XSS 
+        given the user-generated components of the battle-royale arena.
+    -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>SYNC PROTOCOL // OS</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+
+    <!--
+      ==========================================================================
+      ARCHITECTURAL INSTRUCTION: APP SHELL WRAPPER
+      ==========================================================================
+      - DOM Structure: #app-shell contains all UI layers. 
+      - CSS Targeting: #app-shell must act as a fixed, hidden-overflow flex container 
+        (100dvh) to manage the internal scrolling of #viewport independent of the HUD.
+      - Bulletproof Thinking: Isolating the shell prevents mobile browser chrome from 
+        resizing and breaking the 2D arena canvas later.
+    -->
+    <div id="app-shell">
+
+        <!--
+          ==========================================================================
+          ARCHITECTURAL INSTRUCTION: GLOBAL HUD (Heads Up Display)
+          ==========================================================================
+          - DOM Structure: <header id="hud"> contains Identity, Telemetry, and Economy.
+          - Data Attributes: `aria-label` used for screen reader accessibility on progress.
+          - CSS Targeting: Flex row, sticky top, high z-index. Glassmorphism backing.
+          - Suggestion: Bind `#xp-bar-fill` width directly to a reactive state manager 
+            (e.g. Redux/Zustand) to animate on quest completion.
+        -->
+        <header id="hud" class="glass-panel" aria-label="Player Status">
+            
+            <div class="hud-identity">
+                <div class="avatar-container">
+                    <img src="assets/avatar-placeholder.webp" alt="User Avatar" class="avatar-img" loading="eager" width="48" height="48">
+                    <span class="level-indicator badge-cyber" aria-label="Level 12">Lvl.12</span>
+                </div>
+                <div class="rank-container">
+                    <h1 class="pilot-name">SysAdmin_01</h1>
+                    <span id="user-rank" class="rank-badge tier-d">Rank: D-Tier | Novice</span>
+                </div>
+            </div>
+
+            <div class="hud-telemetry">
+                <div class="xp-readout">
+                    <span class="xp-label">SYNC_RATE</span>
+                    <span class="xp-value">4,250 / 5,000 XP</span>
+                </div>
+                <div id="xp-bar-track" class="progress-track" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">
+                    <div id="xp-bar-fill" class="progress-fill fill-accent" style="width: 85%;"></div>
+                </div>
+            </div>
+
+            <div class="hud-economy">
+                <div class="streak-pill pill-container" title="Current Daily Streak">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-fire"><path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"></path></svg>
+                    <span class="streak-count">14 Day</span>
+                </div>
+                <div id="token-pill" class="token-bank pill-container" title="Sync Tokens">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-coin"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8"></path><path d="M12 18V6"></path></svg>
+                    <span class="token-balance">1,024</span>
+                </div>
+            </div>
+        </header>
+
+        <!--
+          ==========================================================================
+          ARCHITECTURAL INSTRUCTION: MAIN VIEWPORT
+          ==========================================================================
+          - DOM Structure: <main id="viewport"> acts as the routing container.
+          - CSS Targeting: overflow-y: auto, scroll-behavior: smooth. 
+          - Bulletproof Thinking: Only direct child <section> elements will dictate 
+            view state via `.active-view`.
+        -->
+        <main id="viewport">
+
+            <!--
+              ======================================================================
+              ARCHITECTURAL INSTRUCTION: QUESTS SECTION
+              ======================================================================
+              - DOM Structure: Holds track selection, category filters, and quest feed.
+              - CSS Targeting: `.active-view` toggles display via `display: flex; flex-direction: column;`
+            -->
+            <section id="view-quests" class="active-view" aria-label="Active Quests">
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: FITNESS TRACK SELECTOR
+                  ==================================================================
+                  - DOM Structure: Radio-button-like behavior implemented via buttons.
+                  - Data Attributes: `data-track` dictates which adaptive parameters 
+                    load into the physical quest cards.
+                  - Suggestion: Require JS to apply `.selected` class and dispatch 
+                    a custom `TrackChangeEvent` to re-render node targets.
+                -->
+                <div id="fitness-track-selector" class="segmented-control" role="group" aria-label="Fitness Track Selection">
+                    <button type="button" class="segment-btn selected" data-track="gym">
+                        <span class="btn-text">Gym</span>
+                    </button>
+                    <button type="button" class="segment-btn" data-track="calisthenics">
+                        <span class="btn-text">Calisthenics</span>
+                    </button>
+                    <button type="button" class="segment-btn" data-track="cardio">
+                        <span class="btn-text">Cardio</span>
+                    </button>
+                </div>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: CATEGORY FILTER BAR
+                  ==================================================================
+                  - DOM Structure: Horizontal scrolling nav (<nav>).
+                  - CSS Targeting: `.category-filter-bar` requires `overflow-x: auto; 
+                    white-space: nowrap; webkit-overflow-scrolling: touch;`.
+                -->
+                <nav class="category-filter-bar" aria-label="Quest Categories">
+                    <ul class="filter-list">
+                        <li class="filter-item"><button class="filter-btn active" data-filter="all">All Nodes</button></li>
+                        <li class="filter-item"><button class="filter-btn" data-filter="physical">Physical</button></li>
+                        <li class="filter-item"><button class="filter-btn" data-filter="campus">Campus</button></li>
+                        <li class="filter-item"><button class="filter-btn" data-filter="knowledge">General Knowledge</button></li>
+                        <li class="filter-item"><button class="filter-btn" data-filter="opsec">OpSec</button></li>
+                    </ul>
+                </nav>
+
+                <div class="quest-feed-container">
+                    
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: QUEST CARD 1 (PHYSICAL)
+                      ==============================================================
+                      - DOM Structure: Semantic <article> wrapper. 
+                      - Data Attributes: `data-quest-id` for backend resolution. 
+                        `data-reward` holds base economy value.
+                      - Bulletproof Thinking: The `.target-checklist` must use <ul> 
+                        for semantic validity. Adaptive parameters inject into `<li>`.
+                    -->
+                    <article class="quest-card type-physical" aria-labelledby="quest-title-alpha">
+                        <header class="quest-header">
+                            <div class="quest-meta">
+                                <span class="category-badge physical-badge">Physical</span>
+                                <span class="rpg-rank-badge rank-c">C-Tier</span>
+                            </div>
+                            <div class="reward-tag">
+                                <span class="reward-val">+50 Tokens</span>
+                            </div>
+                        </header>
+                        <div class="quest-body">
+                            <h2 id="quest-title-alpha" class="quest-title">Node Alpha: Upper Body Matrix</h2>
+                            <p class="quest-desc">Execute structural hypertrophy protocol. Adaptive parameters loaded for [Gym] track.</p>
+                            <ul class="target-checklist">
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="alpha-task-1" class="cyber-checkbox" disabled>
+                                    <label for="alpha-task-1">3 Sets: Incline Push/Press (RPE 8)</label>
+                                </li>
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="alpha-task-2" class="cyber-checkbox" disabled>
+                                    <label for="alpha-task-2">3 Sets: Vertical Pull (RPE 8)</label>
+                                </li>
+                            </ul>
+                        </div>
+                        <footer class="quest-footer">
+                            <button type="button" class="btn-action primary-action" data-quest-id="QST-ALPHA-091" data-reward="50">
+                                INITIALIZE PROTOCOL
+                            </button>
+                        </footer>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: QUEST CARD 2 (CARDIO)
+                      ==============================================================
+                      - Data Attributes: `data-reward="35"`
+                      - CSS Targeting: `.type-cardio` variations for accent borders.
+                    -->
+                    <article class="quest-card type-cardio" aria-labelledby="quest-title-bravo">
+                        <header class="quest-header">
+                            <div class="quest-meta">
+                                <span class="category-badge cardio-badge">Cardio</span>
+                                <span class="rpg-rank-badge rank-d">D-Tier</span>
+                            </div>
+                            <div class="reward-tag">
+                                <span class="reward-val">+35 Tokens</span>
+                            </div>
+                        </header>
+                        <div class="quest-body">
+                            <h2 id="quest-title-bravo" class="quest-title">Node Bravo: Zone 2 Endurance</h2>
+                            <p class="quest-desc">Aerobic base building. Maintain steady-state heart rate to optimize systemic recovery.</p>
+                            <ul class="target-checklist">
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="bravo-task-1" class="cyber-checkbox" disabled>
+                                    <label for="bravo-task-1">Distance: 2km Run OR Duration: 15min Jump Rope</label>
+                                </li>
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="bravo-task-2" class="cyber-checkbox" disabled>
+                                    <label for="bravo-task-2">HR Constraint: Max 145 BPM</label>
+                                </li>
+                            </ul>
+                        </div>
+                        <footer class="quest-footer">
+                            <button type="button" class="btn-action primary-action" data-quest-id="QST-BRAVO-092" data-reward="35">
+                                START TRACKING
+                            </button>
+                        </footer>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: QUEST CARD 3 (MENTAL)
+                      ==============================================================
+                      - DOM Structure: Integrates the General Knowledge Trivia component.
+                      - Suggestion: The action button here triggers a state change to the 
+                        trivia exam overlay rather than basic physical tracking.
+                    -->
+                    <article class="quest-card type-mental" aria-labelledby="quest-title-charlie">
+                        <header class="quest-header">
+                            <div class="quest-meta">
+                                <span class="category-badge mental-badge">Mental</span>
+                                <span class="rpg-rank-badge rank-e">E-Tier</span>
+                            </div>
+                            <div class="reward-tag">
+                                <span class="reward-val">+25 Tokens</span>
+                            </div>
+                        </header>
+                        <div class="quest-body">
+                            <h2 id="quest-title-charlie" class="quest-title">Node Charlie: Daily Logic & Trivia</h2>
+                            <p class="quest-desc">Cognitive load test. Access main-frame databanks to clear the daily trivia array.</p>
+                            <ul class="target-checklist">
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="charlie-task-1" class="cyber-checkbox" disabled>
+                                    <label for="charlie-task-1">Clear 10-Question General Knowledge Puzzle</label>
+                                </li>
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="charlie-task-2" class="cyber-checkbox" disabled>
+                                    <label for="charlie-task-2">Accuracy Threshold: > 70% required</label>
+                                </li>
+                            </ul>
+                        </div>
+                        <footer class="quest-footer">
+                            <button type="button" class="btn-action secondary-action" data-quest-id="QST-CHARLIE-093" data-reward="25">
+                                ACCESS TERMINAL
+                            </button>
+                        </footer>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: QUEST CARD 4 (CAMPUS)
+                      ==============================================================
+                      - Specifics: Node Delta requires Geolocation/QR hardware APIs.
+                      - Bulletproof Thinking: Check navigator.geolocation and barcode 
+                        scanner capability before allowing button press. Disable via JS if nil.
+                    -->
+                    <article class="quest-card type-campus" aria-labelledby="quest-title-delta">
+                        <header class="quest-header">
+                            <div class="quest-meta">
+                                <span class="category-badge campus-badge">Campus</span>
+                                <span class="rpg-rank-badge rank-f">F-Tier</span>
+                            </div>
+                            <div class="reward-tag">
+                                <span class="reward-val">+20 Tokens</span>
+                            </div>
+                        </header>
+                        <div class="quest-body">
+                            <h2 id="quest-title-delta" class="quest-title">Node Delta: Campus Library Check-In</h2>
+                            <p class="quest-desc">Physical space synchronization. Proceed to coordinates and scan the localized anchor node.</p>
+                            <ul class="target-checklist">
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="delta-task-1" class="cyber-checkbox" disabled>
+                                    <label for="delta-task-1">Reach Sector: Central Library</label>
+                                </li>
+                                <li class="checklist-item">
+                                    <input type="checkbox" id="delta-task-2" class="cyber-checkbox" disabled>
+                                    <label for="delta-task-2">Authenticate via Geo/QR Handshake</label>
+                                </li>
+                            </ul>
+                        </div>
+                        <footer class="quest-footer">
+                            <button type="button" class="btn-action secondary-action" data-quest-id="QST-DELTA-094" data-reward="20">
+                                OPEN SCANNER
+                            </button>
+                        </footer>
+                    </article>
+
+                </div>
+            </section>
+<!--
+              ======================================================================
+              ARCHITECTURAL INSTRUCTION: EDUCATIONAL FEED SECTION
+              ======================================================================
+              - DOM Structure: <section id="view-feed"> is a direct sibling of 
+                #view-quests. In the UI state, it is toggled via display properties.
+              - Vertical Snap-Scroll Mechanics: This container MUST use 
+                `scroll-snap-type: y mandatory; overflow-y: scroll; height: 100dvh;` 
+                to create a TikTok/Shorts-style immersive consumption experience.
+              - CSS Targeting: Child `.feed-post` elements must have 
+                `scroll-snap-align: start; height: 100dvh; position: relative;` 
+                to lock into the viewport.
+            -->
+            <section id="view-feed" aria-label="Educational Content Feed">
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: FEED SUB-NAVIGATION
+                  ==================================================================
+                  - DOM Structure: <nav> containing horizontally scrollable track pills.
+                  - CSS Targeting: Requires `position: absolute; top: 0; z-index: 50;` 
+                    to float above the snap-scrolling video/content layer.
+                  - Bulletproof Thinking: Use a glassmorphism gradient masking on 
+                    the edges to indicate horizontal overflow to the user.
+                -->
+                <nav class="feed-header-nav" aria-label="Feed Channels">
+                    <ul class="channel-list">
+                        <li class="channel-item"><button class="channel-btn active" data-channel="foryou">For You</button></li>
+                        <li class="channel-item"><button class="channel-btn" data-channel="science">General Science</button></li>
+                        <li class="channel-item"><button class="channel-btn" data-channel="tech">Tech & Cyber</button></li>
+                        <li class="channel-item"><button class="channel-btn" data-channel="history">World History</button></li>
+                        <li class="channel-item"><button class="channel-btn" data-channel="math">Logic & Math</button></li>
+                    </ul>
+                </nav>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: FEED POST 1 (NEUROPLASTICITY)
+                  ==================================================================
+                  - Subject: Biology / Med Science
+                  - Layout Structure: 
+                    1. `.post-media-layer` (background/main content)
+                    2. `.post-interaction-dock` (right-aligned vertical button stack)
+                    3. `.post-info-layer` (bottom-aligned metadata and caption)
+                -->
+                <article class="feed-post" data-post-id="FEED-BIO-882">
+                    <div class="post-media-layer type-simulation">
+                        <div class="media-simulation-card">
+                            <div class="interactive-diagram-mockup" aria-label="Interactive diagram of neural pathways">
+                                <div class="synaptic-network">
+                                    <div class="neuron node-active">
+                                        <span class="neuron-label">Pre-Synaptic</span>
+                                        <svg class="axon-pathway pathway-active" viewBox="0 0 100 20" preserveAspectRatio="none">
+                                            <path d="M0,10 C30,30 70,-10 100,10" fill="none" stroke="#00ffcc" stroke-width="2" stroke-dasharray="5,5" class="flowing-data"/>
+                                        </svg>
+                                    </div>
+                                    <div class="neuron node-pruned">
+                                        <span class="neuron-label">Pruned Connection</span>
+                                        <svg class="axon-pathway pathway-dead" viewBox="0 0 100 20" preserveAspectRatio="none">
+                                            <path d="M0,10 C40,-5 60,25 100,10" fill="none" stroke="#333344" stroke-width="1" stroke-dasharray="2,8"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="diagram-controls">
+                                    <button class="btn-micro action-stimulate">Apply Stimulus</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <aside class="post-interaction-dock">
+                        <button class="dock-btn btn-like" aria-label="Like Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"></path></svg>
+                            <span class="dock-count">45.2k</span>
+                        </button>
+                        <button class="dock-btn btn-comment" aria-label="Comment on Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+                            <span class="dock-count">1,204</span>
+                        </button>
+                        <button class="dock-btn btn-bookmark" aria-label="Bookmark Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"></path></svg>
+                            <span class="dock-count">8.1k</span>
+                        </button>
+                    </aside>
+
+                    <div class="post-info-layer">
+                        <div class="author-block">
+                            <img src="assets/avatar-med.webp" alt="@med_science avatar" class="author-avatar" width="36" height="36" loading="lazy">
+                            <span class="author-handle">@med_science</span>
+                            <svg class="verified-badge" viewBox="0 0 24 24" fill="#00ffcc"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="post-timestamp">2h ago</span>
+                        </div>
+                        <div class="post-meta-tags">
+                            <span class="topic-pill pill-biology">Biology</span>
+                        </div>
+                        <h3 class="post-title">How Your Brain Rewires Itself (Neuroplasticity)</h3>
+                        <p class="post-caption">
+                            Every time you learn a new chord on the guitar or solve a math equation, you are physically altering your brain's architecture. Notice how the active pathway thickens while the unused node undergoes synaptic pruning. 🧠⚡
+                        </p>
+                    </div>
+                </article>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: FEED POST 2 (INTEREST RATES)
+                  ==================================================================
+                  - Subject: Financial Literacy / Math
+                  - Structural Note: Uses <details> and <summary> for the expandable 
+                    formula box to maintain zero-JS interactivity on mobile.
+                -->
+                <article class="feed-post" data-post-id="FEED-ECON-411">
+                    <div class="post-media-layer type-infographic">
+                        <div class="compound-interest-graph">
+                            <div class="graph-axes">
+                                <div class="bar-group">
+                                    <div class="bar principal-bar" style="height: 20%;" title="Principal: $1000"></div>
+                                    <span class="year-label">Yr 1</span>
+                                </div>
+                                <div class="bar-group">
+                                    <div class="bar principal-bar" style="height: 20%;"></div>
+                                    <div class="bar interest-bar" style="height: 15%;" title="Interest: +$150"></div>
+                                    <span class="year-label">Yr 10</span>
+                                </div>
+                                <div class="bar-group">
+                                    <div class="bar principal-bar" style="height: 20%;"></div>
+                                    <div class="bar interest-bar" style="height: 55%;" title="Compound Effect"></div>
+                                    <span class="year-label">Yr 30</span>
+                                </div>
+                            </div>
+                        </div>
+                        <details class="expandable-formula-breakdown">
+                            <summary class="formula-summary">View Compound Interest Formula</summary>
+                            <div class="formula-content">
+                                <span class="math-block">A = P(1 + r/n)<sup>nt</sup></span>
+                                <ul class="variable-list">
+                                    <li><strong>A</strong> = Final Amount</li>
+                                    <li><strong>P</strong> = Principal Base</li>
+                                    <li><strong>r</strong> = Annual Interest Rate</li>
+                                    <li><strong>n</strong> = Compounds per year</li>
+                                    <li><strong>t</strong> = Time in years</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+
+                    <aside class="post-interaction-dock">
+                        <button class="dock-btn btn-like" aria-label="Like Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"></path></svg>
+                            <span class="dock-count">89.1k</span>
+                        </button>
+                        <button class="dock-btn btn-comment" aria-label="Comment on Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+                            <span class="dock-count">3,340</span>
+                        </button>
+                        <button class="dock-btn btn-bookmark" aria-label="Bookmark Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"></path></svg>
+                            <span class="dock-count">22.4k</span>
+                        </button>
+                    </aside>
+
+                    <div class="post-info-layer">
+                        <div class="author-block">
+                            <img src="assets/avatar-econ.webp" alt="@econ_basics avatar" class="author-avatar" width="36" height="36" loading="lazy">
+                            <span class="author-handle">@econ_basics</span>
+                            <svg class="verified-badge" viewBox="0 0 24 24" fill="#00ffcc"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="post-timestamp">5h ago</span>
+                        </div>
+                        <div class="post-meta-tags">
+                            <span class="topic-pill pill-finance">Financial Literacy</span>
+                        </div>
+                        <h3 class="post-title">The Math Behind Interest Rates</h3>
+                        <p class="post-caption">
+                            Time is your greatest asset. The curve of exponential growth means the interest you earn eventually starts earning its own interest. Expand the box above to see the underlying equation. 📈💰
+                        </p>
+                    </div>
+                </article>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: FEED POST 3 (PUBLIC WI-FI)
+                  ==================================================================
+                  - Subject: Digital Citizenship / OpSec
+                  - Bulletproof Thinking: The safe HTTPS checklist box uses robust 
+                    SVG iconography to visually reinforce cybersecurity hygiene.
+                -->
+                <article class="feed-post" data-post-id="FEED-CYBER-991">
+                    <div class="post-media-layer type-terminal">
+                        <div class="cyber-terminal-window">
+                            <div class="terminal-header">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                                <span class="terminal-title">packet_sniffer.sh</span>
+                            </div>
+                            <div class="terminal-body">
+                                <p class="code-line"><span class="cmd-prompt">root@local:~#</span> airodump-ng wlan0mon</p>
+                                <p class="code-line sys-out">[!] Intercepting plaintext traffic on BSSID: 00:14:22:01:23:45</p>
+                                <p class="code-line sys-alert">WARNING: Rogue AP Detected.</p>
+                            </div>
+                        </div>
+                        <div class="safe-https-checklist-box">
+                            <h4 class="checklist-title">Public Network Protocol</h4>
+                            <ul class="cyber-checklist">
+                                <li class="check-item verified">
+                                    <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="#00ffcc" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Verify HTTPS padlock before login
+                                </li>
+                                <li class="check-item verified">
+                                    <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="#00ffcc" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Use a Zero-Log VPN Tunnel
+                                </li>
+                                <li class="check-item danger">
+                                    <svg class="icon-cross" viewBox="0 0 24 24" fill="none" stroke="#ff3366" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    Avoid accessing banking portals
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <aside class="post-interaction-dock">
+                        <button class="dock-btn btn-like" aria-label="Like Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"></path></svg>
+                            <span class="dock-count">102k</span>
+                        </button>
+                        <button class="dock-btn btn-comment" aria-label="Comment on Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+                            <span class="dock-count">5,112</span>
+                        </button>
+                        <button class="dock-btn btn-bookmark" aria-label="Bookmark Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"></path></svg>
+                            <span class="dock-count">41.8k</span>
+                        </button>
+                    </aside>
+
+                    <div class="post-info-layer">
+                        <div class="author-block">
+                            <img src="assets/avatar-cyber.webp" alt="@cyber_sec avatar" class="author-avatar" width="36" height="36" loading="lazy">
+                            <span class="author-handle">@cyber_sec</span>
+                            <svg class="verified-badge" viewBox="0 0 24 24" fill="#00ffcc"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="post-timestamp">12h ago</span>
+                        </div>
+                        <div class="post-meta-tags">
+                            <span class="topic-pill pill-cyber">Digital Citizenship</span>
+                        </div>
+                        <h3 class="post-title">Why Public Wi-Fi Steals Your Data</h3>
+                        <p class="post-caption">
+                            Connecting to "Free_Airport_WiFi" without a VPN? You might be connecting to a rogue Access Point. Man-in-the-Middle (MitM) attacks allow bad actors to sniff your unencrypted traffic in real-time. Stay vigilant. 🛡️💻
+                        </p>
+                    </div>
+                </article>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: FEED POST 4 (GOLDEN RATIO)
+                  ==================================================================
+                  - Subject: Art & History
+                  - Visual Setup: The mockup layers geometric lines over a base image 
+                    concept to demonstrate architectural proportions.
+                -->
+                <article class="feed-post" data-post-id="FEED-HIST-204">
+                    <div class="post-media-layer type-historical">
+                        <figure class="visual-overlay-mockup">
+                            <img src="assets/parthenon-base.webp" alt="The Parthenon in Athens" class="base-image" loading="lazy">
+                            <div class="golden-spiral-overlay">
+                                <svg class="phi-grid" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                    <rect x="0" y="0" width="100" height="61.8" fill="none" stroke="#ffaa00" stroke-width="0.5" stroke-dasharray="2,2"/>
+                                    <rect x="61.8" y="0" width="38.2" height="61.8" fill="none" stroke="#ffaa00" stroke-width="0.5"/>
+                                    <rect x="61.8" y="61.8" width="38.2" height="38.2" fill="none" stroke="#ffaa00" stroke-width="0.5"/>
+                                    <path d="M0,61.8 Q0,0 61.8,0 T100,61.8" fill="none" stroke="#ffaa00" stroke-width="1.5" class="spiral-path"/>
+                                </svg>
+                                <div class="ratio-badge">
+                                    <span class="phi-symbol">&phi;</span> = 1.618
+                                </div>
+                            </div>
+                        </figure>
+                    </div>
+
+                    <aside class="post-interaction-dock">
+                        <button class="dock-btn btn-like" aria-label="Like Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"></path></svg>
+                            <span class="dock-count">67.3k</span>
+                        </button>
+                        <button class="dock-btn btn-comment" aria-label="Comment on Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+                            <span class="dock-count">1,890</span>
+                        </button>
+                        <button class="dock-btn btn-bookmark" aria-label="Bookmark Post">
+                            <svg class="dock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"></path></svg>
+                            <span class="dock-count">15.6k</span>
+                        </button>
+                    </aside>
+
+                    <div class="post-info-layer">
+                        <div class="author-block">
+                            <img src="assets/avatar-history.webp" alt="@history_arch avatar" class="author-avatar" width="36" height="36" loading="lazy">
+                            <span class="author-handle">@history_arch</span>
+                            <svg class="verified-badge" viewBox="0 0 24 24" fill="#00ffcc"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="post-timestamp">1d ago</span>
+                        </div>
+                        <div class="post-meta-tags">
+                            <span class="topic-pill pill-history">Art & History</span>
+                        </div>
+                        <h3 class="post-title">The Golden Ratio in Architecture</h3>
+                        <p class="post-caption">
+                            From the Parthenon in ancient Greece to modern graphic design, the Fibonacci sequence and Phi (1.618) dictate what the human brain perceives as aesthetically perfect. Notice how the columns align with the grid. 🏛️📐
+                        </p>
+                    </div>
+                </article>
+
+            </section>
+            <!--
+              ======================================================================
+              ARCHITECTURAL INSTRUCTION: HIGH-STAKES EXAMINATION TERMINAL
+              ======================================================================
+              - DOM Structure: <section id="view-tests"> toggles visibility like siblings.
+              - Context: This view strictly enforces focus and disables background processes.
+            -->
+            <section id="view-tests" aria-label="Security & Citizenship Examinations">
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: ANTI-CHEAT TELEMETRY BANNER
+                  ==================================================================
+                  - DOM Structure: Sticky header alerting the user to strict testing conditions.
+                  - Security Logic: JavaScript must bind to the `visibilitychange` event 
+                    (i.e., `document.hidden`). If triggered while a test is active, automatically 
+                    submit a failure state via fetch() and lock the terminal.
+                  - CSS Targeting: `.alert-danger` drives pulse animations and red borders.
+                -->
+                <div id="anti-cheat-telemetry" class="alert-banner alert-danger" role="alert">
+                    <div class="alert-icon-wrapper">
+                        <svg class="icon-warning glitch-effect" viewBox="0 0 24 24" fill="none" stroke="#ff3366" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div class="alert-text-payload">
+                        <strong>INTEGRITY PROTOCOL ACTIVE:</strong> Tab-switching or loss of focus triggers immediate forfeiture.
+                    </div>
+                </div>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: TEST SELECTION HUD
+                  ==================================================================
+                  - DOM Structure: Displays global standing and navigational filters.
+                -->
+                <header class="test-selection-hud">
+                    <div class="global-clearance-score">
+                        <span class="clearance-label">Global Sec. Clearance</span>
+                        <span class="clearance-value text-accent">LEVEL 4 // ANALYST</span>
+                    </div>
+                    <nav class="test-filter-tabs" aria-label="Test Categories">
+                        <button class="filter-tab active" data-test-cat="all">All Trials</button>
+                        <button class="filter-tab" data-test-cat="phishing">Phishing</button>
+                        <button class="filter-tab" data-test-cat="privacy">Data Privacy</button>
+                        <button class="filter-tab" data-test-cat="citizenship">Digital Citizenship</button>
+                    </nav>
+                </header>
+
+                <div class="trial-feed-container">
+                    
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: TRIAL 1 (PHISHING IDENTIFICATION)
+                      ==============================================================
+                      - DOM Structure: <article> encapsulates the trial. <form> holds state.
+                      - Countdown Mechanics: The `.timer-fill` uses CSS transitions. 
+                        When JS initiates the trial, `width` goes from 100% to 0% linearly 
+                        over the `data-duration` value.
+                      - Bulletproof Thinking: `disabled` attributes are present on radio 
+                        inputs until the user explicitly clicks the "PAY ENTRY FEE" / START button.
+                    -->
+                    <article class="trial-card" id="trial-101" data-duration="45">
+                        <header class="trial-header">
+                            <div class="trial-meta-row">
+                                <h3 class="trial-title">Module 101: Identifying Spoofed Domains</h3>
+                                <div class="trial-economy-pills">
+                                    <span class="pill-cost" title="Entry Cost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> 10 Tokens</span>
+                                    <span class="pill-duration" title="Time Limit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 45s</span>
+                                    <span class="pill-reward" title="Potential Reward">+40 Tokens</span>
+                                </div>
+                            </div>
+                            <div class="countdown-track" aria-hidden="true">
+                                <div class="timer-fill" style="width: 100%;"></div>
+                            </div>
+                        </header>
+                        
+                        <div class="trial-narrative-box">
+                            <p class="mission-brief">Analyze the intercepted enterprise communication below. Identify the primary attack vector.</p>
+                            <div class="simulated-email-header">
+                                <div class="email-row"><span class="email-label">From:</span> <span class="email-data text-danger">IT Support &lt;admin@paypa1-security.com&gt;</span></div>
+                                <div class="email-row"><span class="email-label">To:</span> <span class="email-data">user.student@campus.edu</span></div>
+                                <div class="email-row"><span class="email-label">Subject:</span> <span class="email-data font-bold">URGENT: Account Suspension Notice</span></div>
+                                <div class="email-row"><span class="email-label">Date:</span> <span class="email-data">Wed, 14 Oct 2026 16:59:00 -0600</span></div>
+                            </div>
+                        </div>
+
+                        <form class="trial-form" id="form-trial-101">
+                            <fieldset class="radio-input-group">
+                                <legend class="sr-only">Select the exact attack vector</legend>
+                                <label class="radio-option" for="t101-opt-a">
+                                    <input type="radio" name="trial_101_answer" id="t101-opt-a" value="A" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">Valid enterprise alert. No threat detected.</span>
+                                </label>
+                                <label class="radio-option" for="t101-opt-b">
+                                    <input type="radio" name="trial_101_answer" id="t101-opt-b" value="B" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">Spoofed domain (homoglyph/typosquatting on "paypal").</span>
+                                </label>
+                                <label class="radio-option" for="t101-opt-c">
+                                    <input type="radio" name="trial_101_answer" id="t101-opt-c" value="C" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">Missing TLS/SSL certificate in header.</span>
+                                </label>
+                                <label class="radio-option" for="t101-opt-d">
+                                    <input type="radio" name="trial_101_answer" id="t101-opt-d" value="D" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">Invalid sender display name formatting.</span>
+                                </label>
+                            </fieldset>
+                            <div class="trial-actions">
+                                <button type="button" class="btn-action primary-action lock-btn">PAY 10 TOKENS TO INITIATE</button>
+                                <button type="submit" class="btn-action success-action submit-btn hidden">SUBMIT ANALYSIS</button>
+                            </div>
+                        </form>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: TRIAL 2 (PASSWORD ENTROPY)
+                      ==============================================================
+                      - Cost: 15, Duration: 60s, Reward: +60.
+                      - Design: The `simulated-terminal-block` uses monospace fonts 
+                        to replicate backend password hashing outputs for immersion.
+                    -->
+                    <article class="trial-card" id="trial-202" data-duration="60">
+                        <header class="trial-header">
+                            <div class="trial-meta-row">
+                                <h3 class="trial-title">Module 202: Password Entropy Basics</h3>
+                                <div class="trial-economy-pills">
+                                    <span class="pill-cost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> 15 Tokens</span>
+                                    <span class="pill-duration"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 60s</span>
+                                    <span class="pill-reward">+60 Tokens</span>
+                                </div>
+                            </div>
+                            <div class="countdown-track" aria-hidden="true">
+                                <div class="timer-fill" style="width: 100%;"></div>
+                            </div>
+                        </header>
+                        
+                        <div class="trial-narrative-box">
+                            <p class="mission-brief">Evaluate the credential strings extracted from the breach dump. Select the target with the highest mathematical entropy defense against offline brute-forcing.</p>
+                            <div class="simulated-terminal-block text-mono">
+                                <div class="code-line">Target_01 :: "P@ssw0rd1!"</div>
+                                <div class="code-line">Target_02 :: "correcthorsebatterystaple"</div>
+                                <div class="code-line">Target_03 :: "admin1234"</div>
+                            </div>
+                        </div>
+
+                        <form class="trial-form" id="form-trial-202">
+                            <fieldset class="radio-input-group">
+                                <legend class="sr-only">Select the strongest password</legend>
+                                <label class="radio-option" for="t202-opt-a">
+                                    <input type="radio" name="trial_202_answer" id="t202-opt-a" value="A" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">Target_01: Complexity parameters (symbols/numbers) defeat dictionaries.</span>
+                                </label>
+                                <label class="radio-option" for="t202-opt-b">
+                                    <input type="radio" name="trial_202_answer" id="t202-opt-b" value="B" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">Target_02: Extreme length geometrically increases the total permutation keyspace.</span>
+                                </label>
+                                <label class="radio-option" for="t202-opt-c">
+                                    <input type="radio" name="trial_202_answer" id="t202-opt-c" value="C" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">Target_03: Alphanumeric iteration prevents rainbow table lookup.</span>
+                                </label>
+                                <label class="radio-option" for="t202-opt-d">
+                                    <input type="radio" name="trial_202_answer" id="t202-opt-d" value="D" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">All are structurally identical without an applied salt.</span>
+                                </label>
+                            </fieldset>
+                            <div class="trial-actions">
+                                <button type="button" class="btn-action primary-action lock-btn">PAY 15 TOKENS TO INITIATE</button>
+                                <button type="submit" class="btn-action success-action submit-btn hidden">SUBMIT ANALYSIS</button>
+                            </div>
+                        </form>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: TRIAL 3 (FOOTPRINT AUDIT)
+                      ==============================================================
+                      - Cost: 20, Duration: 30s, Reward: +80.
+                      - Logic: Simulates a user scraping EXIF data from an uploaded photo.
+                        The coordinates intentionally match San Juan del Río as an 
+                        in-universe easter egg for localized OpSec training.
+                    -->
+                    <article class="trial-card" id="trial-303" data-duration="30">
+                        <header class="trial-header">
+                            <div class="trial-meta-row">
+                                <h3 class="trial-title">Module 303: Social Media Footprint Audit</h3>
+                                <div class="trial-economy-pills">
+                                    <span class="pill-cost"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> 20 Tokens</span>
+                                    <span class="pill-duration alert-pulse"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> 30s</span>
+                                    <span class="pill-reward">+80 Tokens</span>
+                                </div>
+                            </div>
+                            <div class="countdown-track" aria-hidden="true">
+                                <div class="timer-fill" style="width: 100%;"></div>
+                            </div>
+                        </header>
+                        
+                        <div class="trial-narrative-box">
+                            <p class="mission-brief">A target uploaded an original, uncompressed photo to a public forum. Run a metadata analysis on the raw file object. Identify the primary Operational Security (OpSec) failure.</p>
+                            <div class="simulated-exif-block">
+                                <h4 class="exif-header">FILE: IMG_9901.JPG // PROPERTIES</h4>
+                                <ul class="exif-data-list text-mono">
+                                    <li>Dimensions: 4032 x 3024</li>
+                                    <li>Color Space: sRGB</li>
+                                    <li>GPS_Latitude: 20° 23' 16.8" N (20.388)</li>
+                                    <li>GPS_Longitude: 99° 59' 42.0" W (-99.995)</li>
+                                    <li>Make: Apple // Model: iPhone 15</li>
+                                    <li>DateTimeOriginal: 2026:10:14 16:59:00</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <form class="trial-form" id="form-trial-303">
+                            <fieldset class="radio-input-group">
+                                <legend class="sr-only">Identify the primary OpSec failure</legend>
+                                <label class="radio-option" for="t303-opt-a">
+                                    <input type="radio" name="trial_303_answer" id="t303-opt-a" value="A" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">The image resolution allows for advanced optical character recognition (OCR) zooming.</span>
+                                </label>
+                                <label class="radio-option" for="t303-opt-b">
+                                    <input type="radio" name="trial_303_answer" id="t303-opt-b" value="B" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">EXIF Exchangeable Image File Format tags expose exact geolocation, hardware, and routine timestamps.</span>
+                                </label>
+                                <label class="radio-option" for="t303-opt-c">
+                                    <input type="radio" name="trial_303_answer" id="t303-opt-c" value="C" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">The sRGB color profile is an unsecured protocol lacking cryptographic signatures.</span>
+                                </label>
+                                <label class="radio-option" for="t303-opt-d">
+                                    <input type="radio" name="trial_303_answer" id="t303-opt-d" value="D" disabled>
+                                    <span class="custom-radio-circle"></span>
+                                    <span class="option-text">The JPEG format natively executes steganographic payload scripts upon download.</span>
+                                </label>
+                            </fieldset>
+                            <div class="trial-actions">
+                                <button type="button" class="btn-action primary-action lock-btn">PAY 20 TOKENS TO INITIATE</button>
+                                <button type="submit" class="btn-action success-action submit-btn hidden">SUBMIT ANALYSIS</button>
+                            </div>
+                        </form>
+                    </article>
+
+                </div>
+            </section>
+
+            <!--
+              ======================================================================
+              ARCHITECTURAL INSTRUCTION: 2D BATTLE ROYALE ARENA
+              ======================================================================
+              - DOM Structure: <section id="view-arena"> acts as the game engine container.
+              - Canvas Dimensioning: The <canvas> is strictly hardcoded to width="360" 
+                and height="460" as the internal rendering resolution. CSS will scale 
+                this up to viewport boundaries using `object-fit: contain` or CSS transforms, 
+                ensuring pixel-art assets do not blur and logical coordinates remain consistent.
+              - Context Isolation: This view completely overtakes the screen. The global 
+                #hud is hidden via CSS when `.in-arena-mode` is active on the <body>.
+            -->
+            <section id="view-arena" aria-label="Campus Battle Royale Arena">
+                
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: ARENA HUD & TELEMETRY
+                  ==================================================================
+                  - DOM Structure: Absolute positioned header layered above the canvas.
+                  - CSS Targeting: `pointer-events: none; z-index: 10;` to ensure it 
+                    doesn't block touch inputs meant for the game surface.
+                -->
+                <header id="arena-hud" class="game-ui-layer">
+                    <div class="hud-top-row">
+                        <div class="sector-tag badge-cyber">
+                            <span class="pulse-dot"></span>
+                            <span class="sector-name">ZONE: NORTH COURTS</span>
+                        </div>
+                        <div class="match-stats">
+                            <div class="stat-pill">
+                                <svg class="icon-survivors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                <span class="survivors-counter">42 ALIVE</span>
+                            </div>
+                            <div class="stat-pill highlight-score">
+                                <span class="score-label">HI-SCORE:</span>
+                                <span class="score-value">14,250</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="hud-bars-row">
+                        <div class="vital-bar-container type-hp">
+                            <div class="vital-label">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ff3366" stroke-width="3"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"></path></svg>
+                                <span>HP</span>
+                            </div>
+                            <div id="player-hp-track" class="game-bar-track">
+                                <div id="player-hp-fill" class="game-bar-fill fill-danger" style="width: 100%;"></div>
+                            </div>
+                        </div>
+                        
+                        <!--
+                          ==============================================================
+                          ARCHITECTURAL INSTRUCTION: PASSWORD ENTROPY SHIELD BAR
+                          ==============================================================
+                          - Logic: Shield capacity is directly proportional to the password 
+                            entropy generated in the pre-flight modal.
+                        -->
+                        <div class="vital-bar-container type-shield">
+                            <div class="vital-label">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00ffcc" stroke-width="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                <span>SHLD</span>
+                            </div>
+                            <div id="player-shield-track" class="game-bar-track">
+                                <div id="player-shield-fill" class="game-bar-fill fill-cyber" style="width: 75%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: MINIMAP DOCK
+                  ==================================================================
+                  - DOM Structure: Fixed to the top right or bottom left depending on 
+                    the player's handedness preference (handled by CSS variables).
+                  - Content: Static representation of the mapped bounds, plotting 
+                    risk tiers dynamically.
+                -->
+                <aside id="campus-minimap-dock" class="game-ui-layer">
+                    <div class="minimap-wrapper">
+                        <div class="map-grid">
+                            <div class="map-node node-library tier-high" title="Main Library (High Risk)">
+                                <span class="node-blip red"></span>
+                            </div>
+                            <div class="map-node node-courts tier-low" title="North Courts (Low Risk)">
+                                <span class="node-blip green"></span>
+                            </div>
+                            <div class="map-node node-cafeteria tier-med" title="Cafeteria (Medium Risk)">
+                                <span class="node-blip yellow"></span>
+                            </div>
+                            <div class="map-player-indicator"></div>
+                        </div>
+                        <div class="minimap-legend">
+                            <span class="legend-text">GRID: SECTOR 7G</span>
+                        </div>
+                    </div>
+                </aside>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: THE HTML5 GAME SURFACE
+                  ==================================================================
+                  - Context: The primary rendering target for the Canvas2D API or WebGL. 
+                  - Warning: Do NOT wrap this in unnecessary divs that could intercept 
+                    pointer events. It must be a direct sibling of the HUD layers.
+                -->
+                <div class="canvas-render-target">
+                    <canvas id="game-canvas" width="360" height="460">
+                        Your browser does not support the HTML5 canvas tag. Update your system.
+                    </canvas>
+                </div>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: TACTICAL HUD & VIRTUAL CONTROLS
+                  ==================================================================
+                  - DOM Structure: Fixed bottom UI layered above canvas.
+                  - Touch Mechanics: `div.touch-controls` uses JS multi-touch handlers. 
+                    `touchstart`, `touchmove`, `touchend` must be attached to prevent 
+                    default mobile browser scrolling.
+                -->
+                <footer id="tactical-controls" class="game-ui-layer">
+                    <div class="weapon-inventory-slots">
+                        <div class="inventory-slot slot-active" data-slot="1">
+                            <div class="slot-keybind">1</div>
+                            <div class="slot-icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#00ffcc" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            </div>
+                            <div class="slot-name">Data Blaster</div>
+                            <div class="slot-ammo">INF</div>
+                        </div>
+                        
+                        <div class="inventory-slot slot-cooldown" data-slot="2">
+                            <div class="slot-keybind">2</div>
+                            <div class="slot-icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#ffaa00" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                <div class="cooldown-overlay" style="height: 60%;"></div>
+                            </div>
+                            <div class="slot-name">Firewall Barrier</div>
+                            <div class="slot-ammo">CD: 4s</div>
+                        </div>
+                        
+                        <div class="inventory-slot" data-slot="3">
+                            <div class="slot-keybind">3</div>
+                            <div class="slot-icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#ff3366" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M8 12h8"></path></svg>
+                            </div>
+                            <div class="slot-name">MitM Jammer</div>
+                            <div class="slot-ammo">3/3</div>
+                        </div>
+                    </div>
+
+                    <div class="virtual-touch-controls">
+                        <div class="dpad-container">
+                            <button class="dpad-btn btn-up" aria-label="Move Up"></button>
+                            <button class="dpad-btn btn-left" aria-label="Move Left"></button>
+                            <button class="dpad-btn btn-right" aria-label="Move Right"></button>
+                            <button class="dpad-btn btn-down" aria-label="Move Down"></button>
+                            <div class="dpad-center-nub"></div>
+                        </div>
+                        <div class="action-buttons-container">
+                            <button class="touch-action-btn btn-shoot" aria-label="Primary Attack">
+                                <span class="btn-ring"></span>
+                                <span class="btn-core">FIRE</span>
+                            </button>
+                        </div>
+                    </div>
+                </footer>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: PRE-DROP DEPLOYMENT MODAL
+                  ==================================================================
+                  - Pre-game loadout calculations: 
+                    The script calculates mathematical entropy (H = L * log2(N)).
+                    Every bit of entropy converts directly to 10 points of starting 
+                    Shield HP. Maximum shield cap is 1,280 HP (128 bits).
+                  - DOM Structure: Full-screen overlay blocking game start until configured.
+                -->
+                <div id="arena-preflight-modal" class="modal-overlay preflight-state">
+                    <div class="preflight-dialog-box">
+                        
+                        <header class="preflight-header">
+                            <h2 class="alert-headline text-danger">CAMPUS BREACH IMMINENT: CONFIGURE LOADOUT</h2>
+                            <p class="sub-headline">Establish an encrypted perimeter to generate your drop-in shielding.</p>
+                        </header>
+
+                        <div class="preflight-content-grid">
+                            
+                            <!-- Equipped Skin Preview -->
+                            <div class="loadout-preview-panel">
+                                <div class="preview-backdrop"></div>
+                                <div class="skin-sprite-container">
+                                    <img src="assets/sprites/char-netrunner-idle.gif" alt="Netrunner Skin Preview" class="equipped-skin-img">
+                                </div>
+                                <div class="skin-metadata">
+                                    <span class="skin-name text-accent">CLASS: NETRUNNER</span>
+                                    <span class="skin-perk">+10% Base Movement Speed</span>
+                                </div>
+                            </div>
+
+                            <!-- Password Entropy Shield Station -->
+                            <div class="entropy-shield-station">
+                                <h3 class="station-title">Cryptographic Shield Generator</h3>
+                                
+                                <div class="password-input-group">
+                                    <label for="shield-password-input" class="sr-only">Enter encryption key</label>
+                                    <input type="password" id="shield-password-input" class="cyber-input terminal-font" placeholder="Enter passphrase...">
+                                    <button type="button" class="btn-toggle-visibility" aria-label="Toggle Password Visibility">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+
+                                <div class="realtime-feedback-meters">
+                                    
+                                    <div class="meter-group">
+                                        <div class="meter-labels">
+                                            <span class="meter-name">Length Threshold</span>
+                                            <span class="meter-val" id="meter-val-length">0 / 16 chars</span>
+                                        </div>
+                                        <div class="meter-track">
+                                            <div id="meter-fill-length" class="meter-fill fill-warning" style="width: 0%;"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="meter-group">
+                                        <div class="meter-labels">
+                                            <span class="meter-name">Symbol Diversity</span>
+                                            <span class="meter-val" id="meter-val-diversity">Low Complexity</span>
+                                        </div>
+                                        <div class="meter-track">
+                                            <div id="meter-fill-diversity" class="meter-fill fill-danger" style="width: 25%;"></div>
+                                        </div>
+                                        <ul class="diversity-checklist">
+                                            <li class="check-node" id="req-lower"><span class="check-box"></span> a-z</li>
+                                            <li class="check-node" id="req-upper"><span class="check-box"></span> A-Z</li>
+                                            <li class="check-node" id="req-num"><span class="check-box"></span> 0-9</li>
+                                            <li class="check-node" id="req-sym"><span class="check-box"></span> !@#$</li>
+                                        </ul>
+                                    </div>
+
+                                </div>
+
+                                <div class="shield-generation-result">
+                                    <div class="result-label">Generated Shield Capacity:</div>
+                                    <div class="result-output terminal-font">
+                                        <span id="calculated-shield-hp" class="text-accent">0</span> <span class="text-muted">/ 1280 HP</span>
+                                    </div>
+                                    <div class="entropy-bit-readout text-muted text-micro">
+                                        Calculated Entropy: <span id="calculated-bits">0</span> bits
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <footer class="preflight-footer">
+                            <button id="btn-start-game" class="btn-action primary-action drop-btn" data-cost="10" disabled>
+                                INITIATE DROP [-10 TOKENS]
+                            </button>
+                        </footer>
+
+                    </div>
+                </div>
+
+            </section>
+            <!--
+              ======================================================================
+              ARCHITECTURAL INSTRUCTION: TOKEN ECONOMY & REWARDS HUB
+              ======================================================================
+              - DOM Structure: <section id="view-shop"> manages the digital and physical 
+                yields derived from accumulated Sync Tokens.
+              - Layout: Utilizes CSS Grid for the `.shop-inventory-grid` to handle 
+                multi-column scaling on larger devices, falling back to 1fr on mobile.
+            -->
+            <section id="view-shop" aria-label="Token Economy and Rewards Hub">
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: LIMITED DROP HERO BANNER
+                  ==================================================================
+                  - DOM Structure: High-visibility semantic <header> block.
+                  - CSS Targeting: `.glitch-text` and `.animated-bg` classes imply 
+                    keyframe animations to draw user attention to high-value drops.
+                -->
+                <header id="limited-drop-banner" class="hero-banner promo-glitch">
+                    <div class="banner-content">
+                        <div class="banner-meta">
+                            <span class="rarity-badge badge-mythic">MYTHIC EXCLUSIVE</span>
+                            <span class="live-stock-tag">
+                                <span class="pulse-dot red"></span>
+                                STOCK: 14 / 500 REMAINING
+                            </span>
+                        </div>
+                        <h2 class="promo-headline glitch-text" data-text="Top 1 Viral Server Exclusive">Top 1 Viral Server Exclusive</h2>
+                        <h3 class="promo-subheadline">Glitch-Runner Phantom Skin</h3>
+                        <p class="promo-desc">Equip this ultra-rare cosmetic to manipulate your hitbox in the Campus Arena.</p>
+                        <div class="promo-actions">
+                            <button type="button" class="btn-action mythic-action" aria-label="Claim Glitch-Runner Phantom Skin">
+                                CLAIM NOW <span class="cost-strike">1000</span> <span class="cost-free">FREE</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="banner-visuals">
+                        <img src="assets/shop/phantom-skin-preview.webp" alt="Glitch-Runner Phantom Skin Hologram" class="promo-hologram" loading="eager">
+                    </div>
+                </header>
+
+                <!--
+                  ==================================================================
+                  ARCHITECTURAL INSTRUCTION: SHOP CATEGORY FILTERS
+                  ==================================================================
+                  - DOM Structure: Horizontal scrolling pill menu.
+                -->
+                <nav class="shop-category-filters" aria-label="Shop Categories">
+                    <ul class="filter-pill-list">
+                        <li class="pill-item"><button class="shop-filter-btn active" data-shop-cat="all">All Items</button></li>
+                        <li class="pill-item"><button class="shop-filter-btn" data-shop-cat="skins">Battle Royale Skins</button></li>
+                        <li class="pill-item"><button class="shop-filter-btn" data-shop-cat="vfx">Projectile VFX</button></li>
+                        <li class="pill-item"><button class="shop-filter-btn" data-shop-cat="perks">Campus Perks</button></li>
+                    </ul>
+                </nav>
+
+                <div class="shop-inventory-grid">
+                    
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: SHOP CARD 1 (CLASS PASS)
+                      ==============================================================
+                      - Type: Real-World Yield | Rarity: Legendary
+                      - Design: Card 1 utilizes `.rarity-legendary` to apply a gold 
+                        box-shadow and gradient border.
+                    -->
+                    <article class="shop-card rarity-legendary">
+                        <figure class="shop-thumbnail-container">
+                            <div class="thumbnail-overlay">
+                                <span class="yield-type badge-realworld">Real-World Yield</span>
+                            </div>
+                            <img src="assets/shop/item-class-pass.webp" alt="Gold stylized ticket for class pass" class="shop-item-img" loading="lazy">
+                        </figure>
+                        <div class="shop-card-body">
+                            <div class="shop-item-meta">
+                                <span class="item-rarity text-legendary">LEGENDARY</span>
+                            </div>
+                            <h3 class="shop-item-title">The 50 Free Minutes Class Pass</h3>
+                            <p class="shop-item-desc">Redeem this authenticated blockchain voucher at the main office to legally skip or delay 50 minutes of any elective period. Non-transferable.</p>
+                        </div>
+                        <footer class="shop-card-footer">
+                            <div class="price-pill">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8"></path><path d="M12 18V6"></path></svg>
+                                <span class="price-val">250</span>
+                            </div>
+                            <button type="button" class="btn-buy action-legendary" data-item-id="SHP-PASS-50">ACQUIRE</button>
+                        </footer>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: SHOP CARD 2 (CAFETERIA VOUCHER)
+                      ==============================================================
+                      - Type: Local Sponsor Yield | Rarity: Rare
+                    -->
+                    <article class="shop-card rarity-rare">
+                        <figure class="shop-thumbnail-container">
+                            <div class="thumbnail-overlay">
+                                <span class="yield-type badge-sponsor">Local Sponsor Yield</span>
+                            </div>
+                            <img src="assets/shop/item-cafeteria-voucher.webp" alt="Digital coupon for the campus cafeteria" class="shop-item-img" loading="lazy">
+                        </figure>
+                        <div class="shop-card-body">
+                            <div class="shop-item-meta">
+                                <span class="item-rarity text-rare">RARE</span>
+                            </div>
+                            <h3 class="shop-item-title">Cafeteria 25% Off Voucher</h3>
+                            <p class="shop-item-desc">Scan this generated QR code at checkout to apply a 25% discount to any hot meal combination in the North Wing Cafeteria. Valid for 24 hours post-purchase.</p>
+                        </div>
+                        <footer class="shop-card-footer">
+                            <div class="price-pill">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8"></path><path d="M12 18V6"></path></svg>
+                                <span class="price-val">120</span>
+                            </div>
+                            <button type="button" class="btn-buy action-rare" data-item-id="SHP-CAFE-25">ACQUIRE</button>
+                        </footer>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: SHOP CARD 3 (NEON MATRIX SKIN)
+                      ==============================================================
+                      - Type: Cosmetic | Rarity: Epic
+                    -->
+                    <article class="shop-card rarity-epic">
+                        <figure class="shop-thumbnail-container">
+                            <div class="thumbnail-overlay">
+                                <span class="yield-type badge-cosmetic">Cosmetic</span>
+                            </div>
+                            <img src="assets/shop/item-neon-ship.webp" alt="Neon green wireframe 2D ship sprite" class="shop-item-img" loading="lazy">
+                        </figure>
+                        <div class="shop-card-body">
+                            <div class="shop-item-meta">
+                                <span class="item-rarity text-epic">EPIC</span>
+                            </div>
+                            <h3 class="shop-item-title">Neon Matrix 2D Ship Skin</h3>
+                            <p class="shop-item-desc">Override your default Battle Royale avatar with this legacy wireframe render. Features custom green particle trails and digitized hit-sounds.</p>
+                        </div>
+                        <footer class="shop-card-footer">
+                            <div class="price-pill">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8"></path><path d="M12 18V6"></path></svg>
+                                <span class="price-val">80</span>
+                            </div>
+                            <button type="button" class="btn-buy action-epic" data-item-id="SHP-SKIN-NEON">ACQUIRE</button>
+                        </footer>
+                    </article>
+
+                    <!--
+                      ==============================================================
+                      ARCHITECTURAL INSTRUCTION: SHOP CARD 4 (FIREWALL GLITCH)
+                      ==============================================================
+                      - Type: Cosmetic | Rarity: Rare
+                    -->
+                    <article class="shop-card rarity-rare">
+                        <figure class="shop-thumbnail-container">
+                            <div class="thumbnail-overlay">
+                                <span class="yield-type badge-cosmetic">Cosmetic</span>
+                            </div>
+                            <img src="assets/shop/item-obsidian-glitch.webp" alt="Dark textured barrier with chromatic aberration" class="shop-item-img" loading="lazy">
+                        </figure>
+                        <div class="shop-card-body">
+                            <div class="shop-item-meta">
+                                <span class="item-rarity text-rare">RARE</span>
+                            </div>
+                            <h3 class="shop-item-title">Firewall Skin: Obsidian Glitch</h3>
+                            <p class="shop-item-desc">Modifies the visual output of the Firewall Barrier defensive tool in the Arena. Enemies striking the barrier will see their local UI glitch out briefly.</p>
+                        </div>
+                        <footer class="shop-card-footer">
+                            <div class="price-pill">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8"></path><path d="M12 18V6"></path></svg>
+                                <span class="price-val">60</span>
+                            </div>
+                            <button type="button" class="btn-buy action-rare" data-item-id="SHP-VFX-OBSIDIAN">ACQUIRE</button>
+                        </footer>
+                    </article>
+
+                </div>
+            </section>
+
+        </main> <!-- End of #viewport -->
+
+        <!--
+          ==========================================================================
+          ARCHITECTURAL INSTRUCTION: SYSTEM MODALS
+          ==========================================================================
+          - Modal Toggling Logic: Modals start with the `.modal-hidden` class. 
+            In CSS, `.modal-hidden` applies `opacity: 0; pointer-events: none; visibility: hidden;`.
+            JavaScript removes this class and applies a backdrop-filter blur to the 
+            underlying `#app-shell` to bring the modal into focus. 
+        -->
+
+        <!-- Modal 1: Physical Node QR Scanner -->
+        <div id="verification-modal" class="modal-overlay modal-hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title-verify">
+            <div class="modal-card type-scanner">
+                <header class="modal-header">
+                    <h2 id="modal-title-verify" class="modal-title">AUTHENTICATE PHYSICAL NODE</h2>
+                    <button type="button" class="btn-close-modal" aria-label="Close Scanner Modal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </header>
+                <div class="modal-body">
+                    <div class="camera-feed-simulation">
+                        <div class="scanner-viewfinder">
+                            <span class="bracket top-left"></span>
+                            <span class="bracket top-right"></span>
+                            <span class="bracket bottom-left"></span>
+                            <span class="bracket bottom-right"></span>
+                            <div class="scan-line-animation"></div>
+                        </div>
+                        <p class="feed-status-text">Awaiting QR Code detection...</p>
+                    </div>
+                    
+                    <div class="manual-fallback-section">
+                        <div class="divider-text"><span>OR ENTER NODE KEY</span></div>
+                        <form id="form-manual-node" class="manual-entry-form">
+                            <label for="manual-node-input" class="sr-only">6-Character Node Key</label>
+                            <input type="text" id="manual-node-input" class="cyber-input text-center text-uppercase" placeholder="e.g., A7X-99B" maxlength="7" pattern="[A-Z0-9-]{7}">
+                            <button type="submit" class="btn-action secondary-action w-100">VERIFY KEY</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal 2: Anti-Cheat Tab Switch Penalty -->
+        <div id="anti-cheat-modal" class="modal-overlay modal-hidden" role="alertdialog" aria-modal="true" aria-labelledby="modal-title-cheat">
+            <div class="modal-card type-penalty border-danger">
+                <header class="modal-header header-danger">
+                    <div class="alert-icon-container">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#ff3366" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    <h2 id="modal-title-cheat" class="modal-title text-danger">PROTOCOL BREACH DETECTED</h2>
+                </header>
+                <div class="modal-body">
+                    <p class="penalty-desc">The examination terminal detected a loss of focus or an unauthorized tab switch. Operational Security protocols mandate immediate forfeiture.</p>
+                    <ul class="penalty-list text-mono text-micro">
+                        <li>> Current Trial: FAILED</li>
+                        <li>> Entry Token Cost: FORFEITED</li>
+                        <li>> Security Rating: PENALIZED</li>
+                    </ul>
+                </div>
+                <footer class="modal-footer">
+                    <button type="button" id="btn-ack-penalty" class="btn-action danger-action w-100">ACKNOWLEDGE PENALTY</button>
+                </footer>
+            </div>
+        </div>
+
+        <!--
+          ==========================================================================
+          ARCHITECTURAL INSTRUCTION: BOTTOM NAVIGATION BAR
+          ==========================================================================
+          - Navigation Wiring Logic: JS queries all `.nav-btn` elements. On click, it 
+            reads the `data-target` attribute. It then queries `#viewport > section`, 
+            removes the `.active-view` class from all, and adds it ONLY to the section 
+            matching the `data-target` ID. It also updates the `.active-tab` class 
+            on the clicked nav button for visual feedback.
+        -->
+        <nav id="bottom-nav" aria-label="Main Application Navigation">
+            <ul class="nav-bar-list">
+                
+                <li class="nav-bar-item">
+                    <button type="button" class="nav-btn active-tab" data-target="view-quests" aria-label="View Quests">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <span class="nav-label">Quests</span>
+                    </button>
+                </li>
+                
+                <li class="nav-bar-item">
+                    <button type="button" class="nav-btn" data-target="view-feed" aria-label="View Educational Feed">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                            <line x1="7" y1="2" x2="7" y2="22"></line>
+                            <line x1="17" y1="2" x2="17" y2="22"></line>
+                            <line x1="2" y1="12" x2="22" y2="12"></line>
+                            <line x1="2" y1="7" x2="7" y2="7"></line>
+                            <line x1="2" y1="17" x2="7" y2="17"></line>
+                            <line x1="17" y1="17" x2="22" y2="17"></line>
+                            <line x1="17" y1="7" x2="22" y2="7"></line>
+                        </svg>
+                        <span class="nav-label">Feed</span>
+                    </button>
+                </li>
+                
+                <li class="nav-bar-item item-arena">
+                    <button type="button" class="nav-btn btn-arena-drop" data-target="view-arena" aria-label="Deploy to Arena">
+                        <div class="arena-icon-wrapper">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                <polyline points="2 17 12 22 22 17"></polyline>
+                                <polyline points="2 12 12 17 22 12"></polyline>
+                            </svg>
+                        </div>
+                        <span class="nav-label">Arena</span>
+                    </button>
+                </li>
+                
+                <li class="nav-bar-item">
+                    <button type="button" class="nav-btn" data-target="view-tests" aria-label="View Cybersecurity Tests">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span class="nav-label">Exams</span>
+                    </button>
+                </li>
+                
+                <li class="nav-bar-item">
+                    <button type="button" class="nav-btn" data-target="view-shop" aria-label="View Token Shop">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                        <span class="nav-label">Shop</span>
+                    </button>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div> <!-- End of #app-shell -->
+
+    <!--
+      ==========================================================================
+      ARCHITECTURAL INSTRUCTION: APPLICATION LOGIC SCRIPT
+      ==========================================================================
+      - Script deferment ensures the DOM is fully parsed before attaching listeners.
+    -->
+    <script src="app.js" defer></script>
+</body>
+</html>
