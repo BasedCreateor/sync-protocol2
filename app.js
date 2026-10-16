@@ -10,7 +10,7 @@
  * and then trigger `updateHUD()` and `saveState()`.
  */
 const AppState = {
-    tokens: 0,
+    tokens: 50,
     xp: 0,
     level: 1,
     rank: 'E-Tier',

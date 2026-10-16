@@ -51,13 +51,15 @@
         -->
         <header id="hud" class="glass-panel" aria-label="Player Status">
             
-            <div class="hud-identity">
+            <div id="hud-profile-trigger" class="hud-identity" style="cursor: pointer;">
                 <div class="avatar-container">
-                    <img src="assets/avatar-placeholder.webp" alt="User Avatar" class="avatar-img" loading="eager" width="48" height="48">
-                    <span class="level-indicator badge-cyber" aria-label="Level 12">Lvl.12</span>
-                </div>
-                <div class="rank-container">
-                    <h1 class="pilot-name">SysAdmin_01</h1>
+                    <!-- Added id="user-avatar" so JS can update the image -->
+                     <img id="user-avatar" src="assets/avatar-placeholder.webp" alt="User Avatar" class="avatar-img" loading="eager" width="48" height="48">
+                     <span class="level-indicator badge-cyber" aria-label="Level 12">Lvl.12</span>
+                    </div>
+                    <div class="rank-container">
+                        <!-- Added id="user-name" so JS can update the text -->
+                         \<h1 id="user-name" class="pilot-name">SysAdmin_01</h1>
                     <span id="user-rank" class="rank-badge tier-d">Rank: D-Tier | Novice</span>
                 </div>
             </div>
@@ -1470,7 +1472,7 @@
       ARCHITECTURAL INSTRUCTION: APPLICATION LOGIC SCRIPT
       ==========================================================================
       - Script deferment ensures the DOM is fully parsed before attaching listeners.
-    -->
+    --> profile
     <script src="app.js" defer></script>
 </body>
 </html>
